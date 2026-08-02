@@ -1,0 +1,12 @@
+{
+  "name": "controlvald-functions",
+  "description": "Cloud Functions for ControlVald Push Notifications",
+  "dependencies": {
+    "firebase-admin": "^11.8.0",
+    "firebase-functions": "^4.3.1"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "main": "index.js"
+}

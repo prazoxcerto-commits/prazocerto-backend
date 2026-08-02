@@ -1,0 +1,28 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": [
+    {
+      "site": "prazocerto",
+      "public": ".",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**",
+        "**/*.py",
+        "setup_*.js",
+        "deploy_*.js",
+        "upload_*.js",
+        "serviceAccountKey.json",
+        "output/**",
+        "package.json",
+        "package-lock.json",
+        "functions/**"
+      ]
+    }
+  ],
+  "functions": {
+    "source": "functions"
+  }
+}

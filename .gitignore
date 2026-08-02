@@ -1,0 +1,10 @@
+node_modules/
+serviceAccountKey.json
+*.db
+.firebase/
+.env
+*.log
+output/
+basket_mask.npy
+*.pyc
+__pycache__/

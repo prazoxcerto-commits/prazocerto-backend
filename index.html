@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrazoCerto – Mobile Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a1218;
+      --text: #F8FAFC;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-image: radial-gradient(circle at 50% 0%, #132029 0%, #0a1218 70%);
+    }
+    
+    .preview-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      flex-shrink: 0;
+    }
+    .preview-header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      background: linear-gradient(135deg, #76C41B 0%, #5E9E1C 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .preview-header p {
+      color: #94A3B8;
+      font-size: 0.9rem;
+    }
+
+    /* Device container that scales automatically */
+    .device-wrapper {
+      position: relative;
+      height: 85vh; /* adapts to screen height */
+      max-height: 844px;
+      aspect-ratio: 390 / 844;
+      background: #000;
+      border-radius: min(44px, 5vh);
+      padding: min(12px, 1.5vh);
+      box-shadow: 
+        0 0 0 2px #1a1a1a,
+        0 0 0 6px #333,
+        0 0 0 10px #1a1a1a,
+        0 20px 40px rgba(0,0,0,0.8),
+        0 0 80px rgba(118,196,27,0.2);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 1;
+    }
+
+    /* Notch */
+    .device-wrapper::before {
+      content: '';
+      position: absolute;
+      top: min(12px, 1.5vh);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 35%;
+      height: min(30px, 3vh);
+      background: #000;
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+      z-index: 10;
+    }
+
+    .screen {
+      width: 100%;
+      height: 100%;
+      background: #0e171f;
+      border-radius: min(32px, 4vh);
+      overflow: hidden;
+      position: relative;
+      display: flex;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* For very small desktop windows or actual mobile devices viewing the preview */
+    @media (max-width: 500px), (max-height: 500px) {
+      .preview-header { display: none; }
+      body { background: #0a1218; }
+      .device-wrapper {
+        height: 100vh;
+        width: 100vw;
+        max-height: none;
+        aspect-ratio: auto;
+        border-radius: 0;
+        padding: 0;
+        box-shadow: none;
+      }
+      .device-wrapper::before { display: none; }
+      .screen { border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="preview-header">
+    <h1>PrazoCerto Preview</h1>
+    <p>Visualização em formato Mobile</p>
+  </div>
+
+  <div class="device-wrapper">
+    <div class="screen">
+      <iframe src="app.html" title="PrazoCerto App"></iframe>
+    </div>
+  </div>
+
+</body>
+</html>

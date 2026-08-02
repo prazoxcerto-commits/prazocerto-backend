@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Permite que qualquer um leia o catálogo de fichas técnicas
+    match /fichas_tecnicas/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /fichas_tecnicas/{document}/EAN/{subDoc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Permite leitura e escrita apenas para o usuário autenticado dono dos próprios dados
+    match /user_data/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

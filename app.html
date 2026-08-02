@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>PrazoCerto – Controle Inteligente de Validade e Estoque</title>
+  <meta name="description" content="PrazoCerto: o app inteligente de controle de datas de validade e estoque com leitura de código de barras, alertas e relatórios." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Forçar visual de celular (Mobile Viewport) */
+    @media (min-width: 600px) {
+      body {
+        background-color: #0a1218;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+        z-index: -1;
+      }
+      .app-container, .splash-screen, .bottom-nav {
+        max-width: 414px !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        border-left: 1px solid #1a2a36;
+        border-right: 1px solid #1a2a36;
+        left: 0 !important;
+        right: 0 !important;
+      }
+      .bottom-nav {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+      }
+      .sidebar {
+        display: none !important;
+      }
+      .menu-toggle {
+        display: block !important;
+      }
+    }
+  </style>
+  <!-- Export Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- SPLASH + ONBOARDING + AUTH SCREEN -->
+<div id="splash" class="splash-screen">
+  
+  <!-- 1. ONBOARDING SCREEN (IDÊNTICA À FOTO 1 e 2) -->
+  <div id="onboardingView" style="width:100%; max-width:380px; display:flex; flex-direction:column; align-items:center; justify-content:space-between; min-height:85vh; padding:1.5rem 1.2rem; box-sizing:border-box; text-align:center;">
+    
+    <!-- TOP LOGO SECTION -->
+    <div style="display:flex; flex-direction:column; align-items:center; margin-top:0.5rem;">
+      <div style="margin-bottom: 0.8rem; display:flex; justify-content:center;">
+        <!-- LOGO VERDE CALENDÁRIO COM CHECK 3D -->
+        <svg viewBox="0 0 200 200" width="115" height="115" style="overflow:visible; filter: drop-shadow(0 8px 20px rgba(118,196,27,0.5)) drop-shadow(0 4px 8px rgba(0,0,0,0.6));">
+          <defs>
+            <linearGradient id="pzGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a0f030"/>
+              <stop offset="50%" stop-color="#76C41B"/>
+              <stop offset="100%" stop-color="#4a8010"/>
+            </linearGradient>
+            <linearGradient id="pzGrad3D" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#2d5c09"/>
+              <stop offset="100%" stop-color="#1a3a05"/>
+            </linearGradient>
+            <filter id="pzGlow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <filter id="pzShadow" x="-10%" y="-10%" width="120%" height="130%">
+              <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="rgba(0,0,0,0.6)"/>
+            </filter>
+          </defs>
+          <!-- Sombra 3D da base (lado inferior) -->
+          <rect x="28" y="52" width="150" height="140" rx="36" ry="36" fill="#1a3a05" opacity="0.6"/>
+          <!-- Base do Calendário 3D -->
+          <rect x="25" y="45" width="150" height="140" rx="36" ry="36" fill="#0b141a" stroke="url(#pzGrad)" stroke-width="14" filter="url(#pzGlow)" />
+          <!-- Brilho superior interno -->
+          <rect x="38" y="52" width="126" height="40" rx="20" ry="20" fill="url(#pzGrad)" opacity="0.08"/>
+          <!-- 3 pinos espirais superiores -->
+          <rect x="56" y="24" width="16" height="34" rx="8" fill="url(#pzGrad)" filter="url(#pzShadow)"/>
+          <rect x="92" y="24" width="16" height="34" rx="8" fill="url(#pzGrad)" filter="url(#pzShadow)"/>
+          <rect x="128" y="24" width="16" height="34" rx="8" fill="url(#pzGrad)" filter="url(#pzShadow)"/>
+          <!-- Ícone de Checkmark verde 3D -->
+          <path d="M66,116 L92,142 L136,90" fill="none" stroke="#3a6a0c" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M66,116 L92,142 L136,90" fill="none" stroke="url(#pzGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" filter="url(#pzGlow)"/>
+        </svg>
+      </div>
+
+      <!-- Titulo PrazoCerto 3D (Prazo em Branco, Certo em Verde) -->
+      <div style="font-size: 2.4rem; font-weight: 900; font-family:'Inter', sans-serif; letter-spacing: -0.5px; line-height: 1.1; text-shadow: 0 1px 0 #ccc, 0 2px 0 #aaa, 0 3px 4px rgba(0,0,0,0.5);">
+        <span style="color:#ffffff; text-shadow: 0 1px 0 rgba(200,200,200,0.4), 0 2px 4px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.4);">Prazo</span><span style="color:#76C41B; text-shadow: 0 1px 0 #4a8010, 0 2px 0 #3a6a0c, 0 3px 6px rgba(0,0,0,0.5), 0 0 20px rgba(118,196,27,0.4);">Certo</span>
+      </div>
+      <!-- Subtítulo -->
+      <p style="color:#94a3b8; font-size:0.95rem; font-weight: 400; margin:0.6rem 0 0; max-width: 260px; line-height: 1.35; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+        Controle inteligente de validade e estoque.
+      </p>
+    </div>
+
+    <!-- IMAGEM DA CESTA DE PRODUTOS 3D -->
+    <div style="margin: 0.8rem 0 0 0; width: 100%; display: flex; justify-content: center; align-items: flex-end; background: transparent; border: none; box-shadow: none; position: relative;">
+      <!-- Sombra refletida na base -->
+      <div style="position:absolute; bottom: -8px; left:50%; transform:translateX(-50%); width:200px; height:24px; background: radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, transparent 75%); border-radius:50%; pointer-events:none;"></div>
+      <img src="images/prazocerto_basket.png" alt="PrazoCerto Cesta" style="width: 100%; max-width: 290px; height: auto; object-fit: contain; background: transparent; border: none; box-shadow: none; filter: drop-shadow(0 28px 30px rgba(0,0,0,0.7)) drop-shadow(0 8px 15px rgba(0,0,0,0.45)) drop-shadow(0 2px 5px rgba(0,0,0,0.3)); transform: scale(1.02); position:relative; z-index:1;" />
+    </div>
+
+    <!-- BOTÕES DE AÇÃO -->
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 0.9rem; align-items: center;">
+      <button id="btnComecar" onclick="btnComecarClick()" style="width: 100%; padding: 1.05rem; background: #76C41B; border: none; border-radius: 9999px; color: #ffffff; font-weight: 800; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 0 #4a8010, 0 8px 24px rgba(118,196,27,0.45); transition: transform 0.15s ease, box-shadow 0.15s ease; text-shadow: none; letter-spacing: 0.5px; position: relative; overflow: hidden;">
+        Começar
+      </button>
+      <div style="font-size: 0.95rem; color: #94a3b8;">
+        Já tem uma conta? <a href="javascript:void(0)" onclick="toggleAuthForm('login')" style="color: #76C41B; font-weight: 800; text-decoration: none;">Entrar</a>
+      </div>
+    </div>
+
+    <!-- CSS animação ripple do botão -->
+    <style>
+      #btnComecar:active { transform: translateY(2px); box-shadow: 0 2px 0 #4a8010, 0 4px 12px rgba(118,196,27,0.4); }
+      .btn-ripple {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.45);
+        transform: scale(0);
+        animation: ripple-anim 0.55s linear;
+        pointer-events: none;
+      }
+      @keyframes ripple-anim {
+        to { transform: scale(4); opacity: 0; }
+      }
+      @keyframes btn-pulse {
+        0%   { box-shadow: 0 4px 0 #4a8010, 0 0 0 0 rgba(118,196,27,0.7); }
+        70%  { box-shadow: 0 4px 0 #4a8010, 0 0 0 18px rgba(118,196,27,0); }
+        100% { box-shadow: 0 4px 0 #4a8010, 0 8px 24px rgba(118,196,27,0.45); }
+      }
+      #btnComecar { animation: btn-pulse 2.2s infinite; }
+    </style>
+    <script>
+      function btnComecarClick() {
+        // Cria efeito ripple
+        const btn = document.getElementById('btnComecar');
+        const circle = document.createElement('span');
+        const diameter = Math.max(btn.clientWidth, btn.clientHeight);
+        circle.style.width = circle.style.height = diameter + 'px';
+        circle.style.left = '0px';
+        circle.style.top = '0px';
+        circle.classList.add('btn-ripple');
+        const old = btn.querySelector('.btn-ripple');
+        if (old) old.remove();
+        btn.appendChild(circle);
+        setTimeout(() => toggleAuthForm('register'), 200);
+      }
+    </script>
+
+  </div>
+
+  <!-- 2. AUTH FORMS CONTAINER (LOGIN / CADASTRO / ESQUECI SENHA) -->
+  <div id="authBox" style="display:none; width:100%; max-width:330px; background:var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:1.5rem; box-sizing:border-box; position:relative; overflow:hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+    
+    <!-- HEADER MINI LOGO -->
+    <div style="text-align:center; margin-bottom: 1rem;">
+      <div style="font-size: 1.5rem; font-weight: 900; font-family:'Inter', sans-serif;">
+        <span style="color:#ffffff;">Prazo</span><span style="color:#76C41B;">Certo</span>
+      </div>
+    </div>
+
+    <!-- LOADING OVERLAY -->
+    <div id="authLoading" style="display:none; position:absolute; inset:0; background:rgba(10,18,24,0.9); z-index:10; align-items:center; justify-content:center; flex-direction:column;">
+      <div class="loader-bar" style="width:150px;"><div class="loader-fill"></div></div>
+      <p style="color:var(--text-2); font-size:0.85rem; margin-top:10px;">Autenticando...</p>
+    </div>
+
+    <p id="authErrorMsg" style="color:var(--danger); font-size:0.85rem; margin:0 0 10px 0; min-height:1.2em; text-align:center;"></p>
+    
+    <!-- FORMULARIO DE LOGIN -->
+    <div id="formLogin">
+      <h2 style="margin:0 0 1.2rem; color:var(--text-1); font-size:1.1rem; text-align:center;">Entrar na sua conta</h2>
+      <div style="display:flex; flex-direction:column; gap:0.8rem;">
+        <input id="loginEmail" type="email" placeholder="E-mail"
+          style="width:100%; padding:0.75rem 0.9rem; background:var(--bg-3); border:1px solid var(--border); border-radius:10px; color:var(--text-1); font-size:0.9rem; box-sizing:border-box; outline:none; text-align:center;">
+        <input id="loginPassword" type="password" placeholder="Senha"
+          style="width:100%; padding:0.75rem 0.9rem; background:var(--bg-3); border:1px solid var(--border); border-radius:10px; color:var(--text-1); font-size:0.9rem; box-sizing:border-box; outline:none; text-align:center;">
+        
+        <!-- Lembrar de mim -->
+        <label id="rememberMeLabel" style="display:flex; align-items:center; justify-content:center; gap:0.5rem; cursor:pointer; margin:2px 0;">
+          <input type="checkbox" id="rememberMe" style="width:16px; height:16px; accent-color:var(--primary); cursor:pointer;">
+          <span style="font-size:0.82rem; color:var(--text-2);">Lembrar minha conta</span>
+        </label>
+
+        <div style="text-align:center;">
+          <a href="javascript:void(0)" onclick="toggleAuthForm('forgot')" style="color:var(--primary); font-size:0.8rem; text-decoration:none;">Esqueci a senha</a>
+        </div>
+
+        <button onclick="handleEmailLogin()" style="padding:0.85rem; background:var(--gradient-main); border:none; border-radius:9999px; color:#ffffff; font-weight:800; font-size:0.95rem; cursor:pointer; width:100%; box-shadow:0 4px 14px rgba(118,196,27,0.3);">Entrar</button>
+        
+        <div style="text-align:center; margin:3px 0;">
+          <span style="color:var(--text-2); font-size:0.8rem;">ou</span>
+        </div>
+
+        <button onclick="handleGoogleLogin()" style="padding:0.7rem; background:#fff; border:none; border-radius:9999px; color:#333; font-weight:700; font-size:0.9rem; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" height="18" alt="G"> Entrar com Google
+        </button>
+        
+        <div style="text-align:center; margin-top:10px; border-top:1px solid var(--border); padding-top:10px; display:flex; justify-content:space-between; align-items:center;">
+          <a href="javascript:void(0)" onclick="toggleAuthForm('onboarding')" style="color:var(--text-2); font-size:0.8rem; text-decoration:none;">⬅ Voltar</a>
+          <div>
+            <span style="color:var(--text-2); font-size:0.85rem;">Não tem conta? </span>
+            <a href="javascript:void(0)" onclick="toggleAuthForm('register')" style="color:var(--primary); font-size:0.85rem; text-decoration:none; font-weight:bold;">Criar conta</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORMULARIO DE CADASTRO -->
+    <div id="formRegister" style="display:none;">
+      <h2 style="margin:0 0 1.2rem; color:var(--text-1); font-size:1.1rem; text-align:center;">Criar nova conta</h2>
+      <div style="display:flex; flex-direction:column; gap:0.8rem;">
+        <input id="regName" type="text" placeholder="Nome Completo"
+          style="width:100%; padding:0.75rem 0.9rem; background:var(--bg-3); border:1px solid var(--border); border-radius:10px; color:var(--text-1); font-size:0.9rem; box-sizing:border-box; outline:none; text-align:center;">
+        <input id="regEmail" type="email" placeholder="E-mail"
+          style="width:100%; padding:0.75rem 0.9rem; background:var(--bg-3); border:1px solid var(--border); border-radius:10px; color:var(--text-1); font-size:0.9rem; box-sizing:border-box; outline:none; text-align:center;">
+        <input id="regPassword" type="password" placeholder="Senha (mínimo 6 caracteres)"
+          style="width:100%; padding:0.75rem 0.9rem; background:var(--bg-3); border:1px solid var(--border); border-radius:10px; color:var(--text-1); font-size:0.9rem; box-sizing:border-box; outline:none; text-align:center;">
+        
+        <button onclick="handleEmailRegister()" style="padding:0.85rem; background:var(--gradient-main); border:none; border-radius:9999px; color:#ffffff; font-weight:800; font-size:0.95rem; cursor:pointer; width:100%; margin-top:5px; box-shadow:0 4px 14px rgba(118,196,27,0.3);">Cadastrar</button>
+        
+        <div style="text-align:center; margin-top:10px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:10px;">
+          <a href="javascript:void(0)" onclick="toggleAuthForm('onboarding')" style="color:var(--text-2); font-size:0.8rem; text-decoration:none;">⬅ Início</a>
+          <a href="javascript:void(0)" onclick="toggleAuthForm('login')" style="color:var(--primary); font-size:0.85rem; text-decoration:none; font-weight:bold;">Já tenho conta</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORMULARIO DE RECUPERAR SENHA -->
+    <div id="formForgot" style="display:none;">
+      <h2 style="margin:0 0 1.2rem; color:var(--text-1); font-size:1.1rem; text-align:center;">Recuperar Senha</h2>
+      <p style="color:var(--text-2); font-size:0.8rem; text-align:center; margin-top:0;">Digite seu e-mail para receber o link de redefinição.</p>
+      <div style="display:flex; flex-direction:column; gap:0.8rem;">
+        <input id="forgotEmail" type="email" placeholder="E-mail"
+          style="width:100%; padding:0.75rem 0.9rem; background:var(--bg-3); border:1px solid var(--border); border-radius:10px; color:var(--text-1); font-size:0.9rem; box-sizing:border-box; outline:none; text-align:center;">
+        
+        <button onclick="handlePasswordReset()" style="padding:0.85rem; background:var(--primary); border:none; border-radius:9999px; color:#ffffff; font-weight:800; font-size:0.95rem; cursor:pointer; width:100%; margin-top:5px;">Enviar Link</button>
+        
+        <div style="text-align:center; margin-top:10px;">
+          <a href="javascript:void(0)" onclick="toggleAuthForm('login')" style="color:var(--text-2); font-size:0.85rem; text-decoration:none;">⬅ Voltar para Login</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- APP CONTAINER -->
+<div id="app" class="app-container hidden">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-mark" style="display:flex; align-items:center;">
+        <svg viewBox="0 0 200 200" width="36" height="36" style="overflow:visible; flex-shrink:0;">
+          <defs>
+            <linearGradient id="sbPzGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#88db26"/>
+              <stop offset="100%" stop-color="#5fa01c"/>
+            </linearGradient>
+          </defs>
+          <rect x="25" y="45" width="150" height="140" rx="36" ry="36" fill="#0b141a" stroke="url(#sbPzGrad)" stroke-width="15" />
+          <rect x="56" y="24" width="16" height="34" rx="8" fill="url(#sbPzGrad)" />
+          <rect x="92" y="24" width="16" height="34" rx="8" fill="url(#sbPzGrad)" />
+          <rect x="128" y="24" width="16" height="34" rx="8" fill="url(#sbPzGrad)" />
+          <path d="M66,116 L92,142 L136,90" fill="none" stroke="url(#sbPzGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <div style="font-size: 1.4rem; font-weight: 900; font-family:'Inter', sans-serif; margin-left: 10px;">
+          <span style="color:#ffffff;">Prazo</span><span style="color:#76C41B;">Certo</span>
+        </div>
+      </div>
+      
+      <button class="sidebar-close" id="sidebarClose">✕</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-page="dashboard" id="nav-dashboard">
+        <span class="nav-icon">📊</span>
+        <span>Dashboard</span>
+      </a>
+      <a class="nav-item" data-page="products" id="nav-products">
+        <span class="nav-icon">📦</span>
+        <span>Produtos</span>
+        <span class="nav-badge" id="badge-products">0</span>
+      </a>
+      <a class="nav-item" data-page="alerts" id="nav-alerts">
+        <span class="nav-icon">🔔</span>
+        <span>Alertas</span>
+        <span class="nav-badge danger" id="badge-alerts">0</span>
+      </a>
+
+      <a class="nav-item" data-page="categories" id="nav-categories">
+        <span class="nav-icon">🏷️</span>
+        <span>Categorias</span>
+      </a>
+      <a class="nav-item" data-page="catalog" id="nav-catalog">
+        <span class="nav-icon">📚</span>
+        <span>Catálogo</span>
+      </a>
+      <a class="nav-item" data-page="history" id="nav-history">
+        <span class="nav-icon">📜</span>
+        <span>Histórico</span>
+      </a>
+      <a class="nav-item" data-page="reports" id="nav-reports">
+        <span class="nav-icon">📈</span>
+        <span>Relatórios</span>
+      </a>
+      <a class="nav-item" data-page="settings" id="nav-settings">
+        <span class="nav-icon">⚙️</span>
+        <span>Configurações</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer" style="padding: 1rem 1.25rem; display:flex; flex-direction:column; gap:0.75rem; border-top:1px solid var(--border);">
+      <div class="sidebar-user" style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; width:100%;">
+        <div style="display:flex; align-items:center; gap:0.5rem; overflow:hidden;">
+          <span style="font-size:1.2rem;">👤</span>
+          <span id="sidebarUserEmail" style="font-weight:700; color:#76C41B; font-size:0.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">usuario@email.com</span>
+        </div>
+        <button onclick="handleLogout()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #EF4444; padding: 0.4rem 0.8rem; border-radius: 8px; cursor: pointer; font-weight: 800; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; flex-shrink:0;">🚪 Sair</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- TOP BAR – ORDEM: Avatar | Seletor | [espaço] | Scanner | Sino | Hamburguer -->
+    <header class="topbar">
+      <!-- 1. AVATAR – canto esquerdo, abre modal de perfil -->
+      <div class="topbar-user-avatar" id="userAvatarBtn" title="Ver perfil">
+        <img id="userAvatarImg" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Usuário"/>
+        <input type="file" id="userAvatarInput" accept="image/*" style="display:none;"/>
+      </div>
+
+      <!-- 2. SELETOR DE LOJAS -->
+      <select id="globalLocationFilter" class="select-styled">
+        <option value="all">Todas as Lojas</option>
+      </select>
+
+      <!-- ESPAÇADOR -->
+      <div style="flex:1;"></div>
+
+      <!-- DIREITA: Scanner | Sino | Hamburguer -->
+      <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+        <!-- 3. BOTÃO SCANNER -->
+        <button class="btn-barcode-top" id="addProductBtn" title="Adicionar / Escanear Produto">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+            <path d="M7 8v8M10 8v8M13 8v8M17 8v8"/>
+          </svg>
+        </button>
+
+        <!-- 4. SINO DE ALERTAS -->
+        <div class="topbar-bell-btn" id="topbarBellBtn" onclick="navigate('alerts')" title="Alertas de Vencimento">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="bell-badge" id="topbarBellBadge" style="display:none;">0</span>
+        </div>
+
+        <!-- 5. HAMBURGUER – abre sidebar da direita -->
+        <button class="topbar-hamburger-btn" id="menuToggle" title="Menu">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- PAGES -->
+    <div class="page-content">
+
+      <!-- ===== DASHBOARD ===== -->
+      <section class="page active" id="page-dashboard">
+        <div class="dashboard-greeting">
+          <div style="text-align:center; width:100%;">
+            <h2 class="greeting-text" id="greetingText">Bom dia! 👋</h2>
+            <p class="greeting-sub" style="text-align:center;">Resumo do estoque, <span id="todayDate"></span></p>
+          </div>
+        </div>
+
+        <!-- STAT CARDS 3D REDESENHADOS -->
+        <div class="stats-grid-new">
+          <!-- Azul: Total de Itens -->
+          <div class="stat-card-new stat-blue" onclick="navigate('products')">
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 60 60" width="44" height="44">
+                <defs>
+                  <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#60A5FA"/>
+                    <stop offset="100%" stop-color="#2563EB"/>
+                  </linearGradient>
+                </defs>
+                <!-- Caixa 3D -->
+                <rect x="8" y="18" width="36" height="30" rx="5" fill="url(#blueGrad)" opacity="0.9"/>
+                <polygon points="8,18 26,10 44,18 26,26" fill="#93C5FD"/>
+                <polygon points="44,18 44,48 26,56 26,26" fill="#1D4ED8"/>
+                <!-- Etiqueta na frente -->
+                <rect x="14" y="28" width="24" height="14" rx="3" fill="rgba(255,255,255,0.25)"/>
+                <line x1="16" y1="33" x2="36" y2="33" stroke="white" stroke-width="1.5" opacity="0.7"/>
+                <line x1="16" y1="37" x2="30" y2="37" stroke="white" stroke-width="1.5" opacity="0.5"/>
+              </svg>
+            </div>
+            <div class="stat-card-info">
+              <div class="stat-card-num blue" id="stat-total">0</div>
+              <div class="stat-card-lbl">Total de Itens</div>
+            </div>
+          </div>
+
+          <!-- Verde: Produtos na Validade -->
+          <div class="stat-card-new stat-green" onclick="navigate('products')">
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 60 60" width="44" height="44">
+                <defs>
+                  <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#4ADE80"/>
+                    <stop offset="100%" stop-color="#16A34A"/>
+                  </linearGradient>
+                </defs>
+                <!-- Escudo -->
+                <path d="M30,6 L50,14 L50,30 Q50,46 30,54 Q10,46 10,30 L10,14 Z" fill="url(#greenGrad)" opacity="0.9"/>
+                <path d="M30,10 L46,17 L46,30 Q46,43 30,50 Q14,43 14,30 L14,17 Z" fill="#86EFAC" opacity="0.4"/>
+                <!-- Check mark -->
+                <path d="M20,30 L27,37 L40,22" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="stat-card-info">
+              <div class="stat-card-num green" id="stat-ok">0</div>
+              <div class="stat-card-lbl">Na Validade</div>
+            </div>
+          </div>
+
+          <!-- Amarelo: Vence em Breve -->
+          <div class="stat-card-new stat-yellow" onclick="navigate('alerts')">
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 60 60" width="44" height="44">
+                <defs>
+                  <linearGradient id="yellowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#FCD34D"/>
+                    <stop offset="100%" stop-color="#D97706"/>
+                  </linearGradient>
+                </defs>
+                <!-- Relógio / Calendário -->
+                <circle cx="30" cy="32" r="20" fill="url(#yellowGrad)" opacity="0.9"/>
+                <circle cx="30" cy="32" r="16" fill="#FEF3C7" opacity="0.35"/>
+                <!-- Ponteiros -->
+                <line x1="30" y1="32" x2="30" y2="20" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                <line x1="30" y1="32" x2="40" y2="36" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                <circle cx="30" cy="32" r="2.5" fill="white"/>
+                <!-- Alça superior -->
+                <rect x="22" y="8" width="16" height="10" rx="5" fill="url(#yellowGrad)"/>
+                <rect x="26" y="5" width="8" height="8" rx="4" fill="#FCD34D"/>
+              </svg>
+            </div>
+            <div class="stat-card-info">
+              <div class="stat-card-num yellow" id="stat-warn">0</div>
+              <div class="stat-card-lbl">Vence em Breve</div>
+            </div>
+          </div>
+
+          <!-- Vermelho: Vencidos -->
+          <div class="stat-card-new stat-red" onclick="navigate('alerts')">
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 60 60" width="44" height="44">
+                <defs>
+                  <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#F87171"/>
+                    <stop offset="100%" stop-color="#B91C1C"/>
+                  </linearGradient>
+                </defs>
+                <!-- Triângulo de alerta -->
+                <polygon points="30,6 56,52 4,52" fill="url(#redGrad)" opacity="0.9"/>
+                <polygon points="30,10 52,50 8,50" fill="#FCA5A5" opacity="0.25"/>
+                <!-- ! -->
+                <rect x="27.5" y="22" width="5" height="16" rx="2.5" fill="white"/>
+                <circle cx="30" cy="44" r="3" fill="white"/>
+              </svg>
+            </div>
+            <div class="stat-card-info">
+              <div class="stat-card-num red" id="stat-expired">0</div>
+              <div class="stat-card-lbl">Vencidos</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VISÃO GERAL CHART SECTION -->
+        <div class="visao-geral-card">
+          <div class="visao-geral-header">
+            <h3>Visão Geral</h3>
+            <div class="period-selector-wrapper">
+              <select id="dashPeriodSelect" class="period-select" onchange="updateDashChart()">
+                <option value="week">Esta semana</option>
+                <option value="today">Hoje</option>
+                <option value="month">Este mês</option>
+              </select>
+            </div>
+          </div>
+          <div class="visao-geral-body">
+            <!-- Donut chart -->
+            <div class="donut-wrapper">
+              <canvas id="statusChart" width="180" height="180"></canvas>
+              <div class="donut-center">
+                <div class="donut-num" id="donutTotal">0</div>
+                <div class="donut-label">Total<br>itens</div>
+              </div>
+            </div>
+            <!-- Legend -->
+            <div class="chart-legend-new" id="chartLegend"></div>
+          </div>
+        </div>
+
+        <!-- ALERTAS URGENTES -->
+        <div class="section-header" style="margin-top:1.5rem;">
+          <h3>🚨 Alertas Urgentes</h3>
+          <a class="see-all" data-page="alerts">Ver todos</a>
+        </div>
+        <div class="alerts-list" id="urgentAlertsList">
+          <div class="empty-state-small">Nenhum alerta urgente 🎉</div>
+        </div>
+
+        <!-- ADICIONADOS RECENTEMENTE -->
+        <div class="section-header" style="margin-top:1rem;">
+          <h3>🕐 Adicionados Recentemente</h3>
+        </div>
+        <div class="recent-list" id="recentList">
+          <div class="empty-state-small">Nenhum produto ainda</div>
+        </div>
+
+      </section>
+      <!-- ===== PRODUCTS ===== -->
+      <section class="page" id="page-products">
+        <div class="products-toolbar">
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="ok">✅ Na Validade</button>
+            <button class="filter-tab" data-filter="warn">⚠️ Atenção</button>
+            <button class="filter-tab" data-filter="expired">❌ Vencidos</button>
+          </div>
+          <div class="products-right-actions">
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:10px;">
+              <button class="btn-outline" id="exportBtn">⬇ JSON</button>
+              <button class="btn-outline" id="exportCsvBtn">📊 CSV</button>
+              <button class="btn-outline" id="importBtn">⬆ JSON</button>
+              <button class="btn-outline" id="importExcelBtn">📗 Excel</button>
+              <input type="file" id="importFile" accept=".json" style="display:none"/>
+              <input type="file" id="importExcelFile" accept=".xlsx,.xls" style="display:none"/>
+            </div>
+            <select id="filterCategory" class="select-styled">
+              <option value="all">Todas as Categorias</option>
+            </select>
+            <select id="sortProducts" class="select-styled">
+              <option value="expiry">Validade ↑</option>
+              <option value="expiry-desc">Validade ↓</option>
+              <option value="name">Nome</option>
+              <option value="category">Categoria</option>
+            </select>
+          </div>
+        </div>
+        <div style="padding: 0 0 8px 0;">
+          <div class="search-bar" style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15); border-radius:10px; display:flex; align-items:center; padding:0 10px; gap:8px;">
+            <span style="font-size:1rem;">🔍</span>
+            <input type="text" id="productSearch" placeholder="Buscar por nome ou código..." autocomplete="off" style="background:transparent; border:none; outline:none; color:#F8FAFC; font-size:0.88rem; width:100%; padding:0.5rem 0;"/>
+          </div>
+        </div>
+        <div class="products-grid" id="productsGrid">
+          <div class="empty-state">
+            <div class="empty-icon">📦</div>
+            <h3>Nenhum produto cadastrado</h3>
+            <p>Clique em "+ Adicionar" ou escaneie um código de barras para começar.</p>
+            <button class="btn-primary" id="emptyAddBtn">+ Adicionar Produto</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ALERTS ===== -->
+      <section class="page" id="page-alerts">
+        <div class="alerts-header-bar">
+          <div class="alerts-filter-tabs">
+            <button class="filter-tab active" data-alert-filter="expired">Venc.</button>
+            <button class="filter-tab" data-alert-filter="warn">7d</button>
+            <button class="filter-tab" data-alert-filter="15">15d</button>
+            <button class="filter-tab" data-alert-filter="soon">30d</button>
+          </div>
+          <button class="btn-danger-outline" id="clearExpiredBtn">🗑 Remover Vencidos</button>
+        </div>
+        <div class="alerts-full-list" id="alertsFullList">
+          <div class="empty-state">
+            <div class="empty-icon">🎉</div>
+            <h3>Tudo certo!</h3>
+            <p>Nenhum produto próximo do vencimento.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== SCANNER ===== -->
+      <section class="page" id="page-scanner">
+        <div class="scanner-container">
+          <div class="scanner-hero">
+            <h2>📷 Scanner de Código</h2>
+            <p>Escaneie código de barras ou QR Code para adicionar produtos rapidamente</p>
+          </div>
+          <div class="scanner-box" id="scannerBox">
+            <div class="scanner-frame" style="position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000;">
+              <div id="scannerFrameDiv" style="width: 100%; min-height: 300px;"></div>
+            <div class="scan-overlay" style="pointer-events: none; position: absolute; top:0; left:0; width:100%; height:100%;">
+              <div class="scan-corner tl"></div>
+              <div class="scan-corner tr"></div>
+              <div class="scan-corner bl"></div>
+              <div class="scan-corner br"></div>
+              <div class="scan-line"></div>
+              <span class="scan-guide-text">↕ Alinhe o código de barras na linha vermelha</span>
+            </div>
+            </div>
+          </div>
+          <div class="scanner-result hidden" id="scanResult">
+            <div class="result-card">
+              <div class="result-icon">✅</div>
+              <div class="result-code" id="resultCode"></div>
+              <p>Código detectado! Preencha os dados do produto:</p>
+            </div>
+          </div>
+          <div class="scanner-actions">
+            <button class="btn-glow" id="startScanBtn">▶ Iniciar Scanner</button>
+            <button class="btn-outline" id="stopScanBtn" style="display:none">⏹ Parar</button>
+            <button class="btn-outline" id="manualCodeBtn">✏️ Inserir Código Manualmente</button>
+          </div>
+          <div class="manual-input hidden" id="manualInput">
+            <input type="text" id="manualCodeInput" placeholder="Digite o código de barras ou EAN..." class="input-styled"/>
+            <button class="btn-primary" id="manualCodeSubmit">Buscar Produto</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== CATEGORIES ===== -->
+      <section class="page" id="page-categories">
+        <div class="categories-toolbar">
+          <button class="btn-primary" id="addCategoryBtn">+ Nova Categoria</button>
+        </div>
+        <div class="categories-grid" id="categoriesGrid"></div>
+      </section>
+
+      <section class="page" id="page-catalog">
+        <div id="catalogBrandView">
+          <div class="products-toolbar">
+            <div class="filter-tabs"><h2 style="font-size:1.1rem;white-space:nowrap;">📚 Catálogo de Produtos</h2></div>
+          </div>
+          <div class="brands-grid" id="brandsGrid">
+            <div class="brand-card" data-brand="Danone">
+              <div class="brand-letter" style="font-family:'Georgia',serif;font-size:3rem;font-weight:900;color:var(--primary);font-style:italic;letter-spacing:-2px;text-shadow:0 0 15px var(--primary),0 0 30px var(--secondary);">D</div>
+              <div class="brand-name">Danone</div>
+            </div>
+            <div class="brand-card" data-brand="Batavo">
+              <div class="brand-letter" style="font-family:'Georgia',serif;font-size:3rem;font-weight:900;color:var(--primary);font-style:italic;letter-spacing:-2px;text-shadow:0 0 15px var(--primary),0 0 30px var(--secondary);">B</div>
+              <div class="brand-name">Batavo</div>
+            </div>
+            <div class="brand-card" data-brand="Nestlé">
+              <div class="brand-letter" style="font-family:'Georgia',serif;font-size:3rem;font-weight:900;color:var(--primary);font-style:italic;letter-spacing:-2px;text-shadow:0 0 15px var(--primary),0 0 30px var(--secondary);">N</div>
+              <div class="brand-name">Nestlé</div>
+            </div>
+            <div class="brand-card" data-brand="Vigor">
+              <div class="brand-letter" style="font-family:'Georgia',serif;font-size:3rem;font-weight:900;color:var(--primary);font-style:italic;letter-spacing:-2px;text-shadow:0 0 15px var(--primary),0 0 30px var(--secondary);">V</div>
+              <div class="brand-name">Vigor</div>
+            </div>
+          </div>
+        </div>
+        <div id="catalogProductView" style="display:none;">
+          <div class="products-toolbar">
+            <div class="filter-tabs">
+              <button class="btn-back" id="backToBrands">← Marcas</button>
+              <h2 id="catalogBrandTitle">📚 Catálogo</h2>
+            </div>
+            <div class="products-right-actions">
+              <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="catalogSearch" placeholder="Buscar..." autocomplete="off"/>
+              </div>
+            </div>
+          </div>
+          <div class="products-grid" id="catalogGrid"></div>
+        </div>
+        <div id="imgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;" onclick="this.style.display='none'">
+          <div style="background:#FFFFFF; padding:16px 20px; border-radius:12px; max-width:90%; max-height:80%; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+            <img id="imgModalSrc" style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:4px; image-rendering:pixelated;">
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== HISTORY ===== -->
+      <section class="page" id="page-history">
+        <div class="products-toolbar">
+          <div class="filter-tabs">
+            <h2>📜 Histórico de Registros</h2>
+          </div>
+        </div>
+        <div class="alerts-full-list" id="historyList">
+          <div class="empty-state">
+            <div class="empty-icon">📜</div>
+            <h3>Nenhum histórico encontrado</h3>
+          </div>
+        </div>
+      </section>
+      <!-- ===== REPORTS ===== -->
+      <section class="page" id="page-reports">
+        <div class="reports-grid">
+          <div class="report-card">
+            <div class="report-icon">📊</div>
+            <h3>Relatório Mensal</h3>
+            <p>Produtos vencidos e válidos por mês</p>
+            <canvas id="monthlyChart" width="300" height="160"></canvas>
+          </div>
+          <div class="report-card">
+            <div class="report-icon">🏷️</div>
+            <h3>Por Categoria</h3>
+            <p>Distribuição de produtos</p>
+            <canvas id="categoryChart" width="300" height="160"></canvas>
+          </div>
+          <div class="report-card full-width">
+            <div class="report-icon">⚡</div>
+            <h3>Linha do Tempo</h3>
+            <p>Produtos com vencimento próximo Nãos próximos 60 dias</p>
+            <div class="timeline-list" id="timelineList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== SETTINGS ===== -->
+      <section class="page" id="page-settings">
+        <div class="settings-grid">
+          <div class="settings-card">
+            <h3>🔔 Notificações</h3>
+            <div class="setting-item">
+              <label>Alertar com antecedência de</label>
+              <div class="setting-control">
+                <input type="number" id="warnDays" value="7" min="1" max="90" class="input-small"/>
+                <span>dias</span>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Alertas críticos</label>
+              <div class="setting-control">
+                <input type="number" id="critDays" value="3" min="1" max="30" class="input-small"/>
+                <span>dias</span>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Notificações do navegador</label>
+              <div class="setting-control">
+                <label class="toggle">
+                  <input type="checkbox" id="NotifToggle"/>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>🎨 Aparência</h3>
+            <div class="setting-item">
+              <label>Tema</label>
+              <div class="setting-control">
+                <select id="themeSelect" class="select-styled">
+                  <option value="dark">🌙 Dark (Padrão)</option>
+                  <option value="darker">⚫ Ultra Dark</option>
+                  <option value="purple">💜 Purple Night</option>
+                  <option value="green">💚 Matrix Green</option>
+                  <option value="light">☀️ Light Mode</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Animações</label>
+              <div class="setting-control">
+                <label class="toggle">
+                  <input type="checkbox" id="animToggle" checked/>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>💾 Dados</h3>
+            <div class="setting-item">
+              <label>Exportar todos os dados</label>
+              <div class="setting-control">
+                <button class="btn-outline" id="exportAllBtn">⬇ Exportar JSON</button>
+                <button class="btn-outline" id="exportCsvAllBtn">📊 Exportar CSV</button>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Importar dados</label>
+              <div class="setting-control">
+                <button class="btn-outline" id="importAllBtn">⬆ Importar JSON</button>
+                <button class="btn-outline" id="importExcelAllBtn">📗 Importar Excel</button>
+                <input type="file" id="importAllFile" accept=".json" style="display:none"/>
+                <input type="file" id="importExcelAllFile" accept=".xlsx,.xls" style="display:none"/>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Limpar todos os dados</label>
+              <div class="setting-control">
+                <button class="btn-danger-outline" id="clearAllBtn">🗑 Limpar Tudo</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>ℹ️ Sobre</h3>
+            <div class="about-info">
+              <div class="about-logo" style="font-size:1.6rem; font-weight:900; letter-spacing:-0.5px;"><span style="color:#ffffff;">Prazo</span><span style="color:#76C41B;">Certo</span></div>
+              <div class="about-version">Versão 1.0.0 Premium</div>
+              <div class="about-desc">O app de controle de validade mais avançado do mercado. Gestão inteligente, alertas em tempo real e scanner integrado.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /page-content -->
+  </main><!-- /main-content -->
+</div><!-- /app -->
+
+<!-- BOTTOM NAV (mobile only) -->
+<div class="bottom-nav-user-bar" id="bnavUserBar" style="display:none; position:fixed; bottom:65px; left:0; right:0; z-index:999; background:rgba(8,8,18,0.97); border-top:1px solid rgba(0,229,255,0.15); padding:0.3rem 1rem; display:none; align-items:center; justify-content:space-between; gap:0.5rem; font-size:0.72rem; color:var(--text-2);">
+  <span style="display:flex;align-items:center;gap:0.4rem;">
+    <span style="font-size:1rem;">👤</span>
+    <span id="bnavUserEmail" style="font-weight:600; color:var(--primary); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+  </span>
+  <button onclick="handleLogout()" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);color:#EF4444;padding:0.25rem 0.6rem;border-radius:6px;font-size:0.7rem;font-weight:700;cursor:pointer;">🚪 Sair</button>
+</div>
+<nav class="bottom-nav" id="bottomNav">
+  <a class="bottom-nav-item active" data-page="dashboard" id="bnav-dashboard">
+    <span class="bnav-icon">📊</span>
+    <span class="bnav-label">Dashboard</span>
+  </a>
+  <a class="bottom-nav-item" data-page="products" id="bnav-products">
+    <span class="bnav-icon">📦</span>
+    <span class="bnav-label">Produtos</span>
+  </a>
+  <a class="bottom-nav-item" data-page="alerts" id="bnav-alerts">
+    <span class="bnav-icon">🔔</span>
+    <span class="bnav-label">Alertas</span>
+    <span class="bnav-badge" id="bnav-badge-alerts"></span>
+  </a>
+  <a class="bottom-nav-item" data-page="catalog" id="bnav-catalog">
+    <span class="bnav-icon">📚</span>
+    <span class="bnav-label">Catálogo</span>
+  </a>
+  <a class="bottom-nav-item" data-page="settings" id="bnav-settings">
+    <span class="bnav-icon">⚙️</span>
+    <span class="bnav-label">Config</span>
+  </a>
+</nav>
+
+<!-- MODAL: ADD/EDIT PRODUCT -->
+<div class="modal-overlay hidden" id="productModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Novo Produto</h2>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto; max-height:65vh;">
+      <div class="form-row" id="prodImageContainer" style="display:none; justify-content:center; margin-bottom:15px; flex-direction:column; align-items:center; gap:10px;">
+       <img id="prodImage" src="" alt="Foto" style="max-height:120px; border-radius:8px; object-fit:contain;"/>
+       <img id="prodBarcodeImage" src="" alt="Barcode" onerror="this.style.display='none'" style="max-height:40px; border-radius:4px; object-fit:contain; background:white; padding:4px;"/>
+     </div>
+      <div id="prodNotFoundMsg" style="display:none; color: var(--primary); text-align:center; font-weight:bold; margin-bottom:10px;">
+        Produto não encontrado.
+      </div>
+      <div style="text-align:center; margin-bottom:15px; display:none;" id="btnGoCatalogContainer">
+        <button class="btn-outline" id="btnGoCatalog">Cadastrar Novo produto</button>
+      </div>
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label>Nome do Produto *</label>
+          <input type="text" id="prodName" placeholder="Ex: Leite Integral 1L" class="input-styled" required/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Código de Barras / EAN</label>
+          <div class="input-with-btn">
+            <input type="text" id="prodCode" placeholder="Ex: 7891025113447" class="input-styled" inputmode="numeric"/>
+            <button class="btn-icon-sm" id="scanFromModal" title="Escanear código de barras com a câmera">📷</button>
+          </div>
+          <!-- Scanner inline dentro do modal -->
+          <div id="inlineScannerContainer" style="display:none; margin-top:10px; border-radius:10px; overflow:hidden; position:relative;">
+            <div id="inlineScannerDiv" style="width:100%; height:240px;"></div>
+            <button id="stopInlineScanBtn" style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.7); color:#fff; border:none; border-radius:50%; width:32px; height:32px; cursor:pointer; font-size:1rem;">✕</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <select id="prodCategory" class="select-styled">
+            <option value="">Selecionar...</option>
+          </select>
+          <label style="display:flex; align-items:center; gap:0.5rem; margin-top:0.5rem; cursor:pointer;">
+            <input type="checkbox" id="prodAutoCategory" checked />
+            <span style="font-size:0.85rem; color:#94A3B8;">Auto-categorizar pelo Nome</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Data de Fabricação</label>
+          <input type="date" id="prodMfgDate" class="input-styled"/>
+        </div>
+        <div class="form-group">
+          <label>Data de Validade *</label>
+          <input type="date" id="prodExpDate" class="input-styled" required/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Quantidade</label>
+          <input type="number" id="prodQty" value="1" min="1" class="input-styled"/>
+        </div>
+        <div class="form-group">
+          <label>Cadastrar/Loja</label>
+          <div class="input-with-btn">
+            <select id="prodLocation" class="select-styled">
+              <option value="">Cadastrar</option>
+            </select>
+            <button class="btn-icon-sm" id="addStoreBtn" title="Nova Loja">➕</button>
+            <button class="btn-icon-sm" id="deleteStoreBtn" title="Excluir Loja" style="background: rgba(239, 68, 68, 0.1); color: var(--primary); border-color: rgba(239, 68, 68, 0.2);">🗑</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label>Observações</label>
+          <textarea id="prodNotes" placeholder="Notas adicionais..." class="input-styled" rows="2"></textarea>
+        </div>
+      </div>
+      <!-- Expiry Gauge -->
+      <div class="expiry-preview hidden" id="expiryPreview">
+        <div class="expiry-gauge">
+          <div class="gauge-label" id="gaugeLabel">—</div>
+          <div class="gauge-bar">
+            <div class="gauge-fill" id="gaugeFill"></div>
+          </div>
+          <div class="gauge-sub" id="gaugeSub"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" id="modalCancel">Cancelar</button>
+      <button class="btn-primary" id="modalSave">💾 Salvar Produto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CATEGORY -->
+<div class="modal-overlay hidden" id="categoryModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2>Nãova Categoria</h2>
+      <button class="modal-close" id="catModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group full-width">
+        <label>Nome da Categoria</label>
+        <input type="text" id="catName" placeholder="Ex: Laticínios" class="input-styled"/>
+      </div>
+      <div class="form-group full-width">
+        <label>Emoji / Ícone</label>
+        <div class="emoji-picker" id="emojiPicker">
+          <span class="emoji-opt selected" data-emoji="📦">📦</span>
+          <span class="emoji-opt" data-emoji="🥛">🥛</span>
+          <span class="emoji-opt" data-emoji="🥩">🥩</span>
+          <span class="emoji-opt" data-emoji="🥗">🥗</span>
+          <span class="emoji-opt" data-emoji="🍞">🍞</span>
+          <span class="emoji-opt" data-emoji="🧴">🧴</span>
+          <span class="emoji-opt" data-emoji="💊">💊</span>
+          <span class="emoji-opt" data-emoji="🧹">🧹</span>
+          <span class="emoji-opt" data-emoji="🍷">🍷</span>
+          <span class="emoji-opt" data-emoji="🌿">🌿</span>
+          <span class="emoji-opt" data-emoji="🧊">🧊</span>
+          <span class="emoji-opt" data-emoji="🍫">🍫</span>
+        </div>
+        <input type="text" id="catEmoji" value="📦" class="input-styled" style="width:80px; text-align:center; font-size:1.5rem; margin-top:0.5rem;"/>
+      </div>
+      <div class="form-group full-width">
+        <label>Cor</label>
+        <div class="color-picker" id="colorPicker">
+          <span class="color-opt selected" data-color="#6EE7B7" style="background:#6EE7B7"></span>
+          <span class="color-opt" data-color="#3B82F6" style="background:#3B82F6"></span>
+          <span class="color-opt" data-color="#A78BFA" style="background:#A78BFA"></span>
+          <span class="color-opt" data-color="#F59E0B" style="background:#F59E0B"></span>
+          <span class="color-opt" data-color="#EF4444" style="background:#EF4444"></span>
+          <span class="color-opt" data-color="#EC4899" style="background:#EC4899"></span>
+          <span class="color-opt" data-color="#06B6D4" style="background:#06B6D4"></span>
+          <span class="color-opt" data-color="#F97316" style="background:#F97316"></span>
+        </div>
+        <input type="color" id="catColor" value="#6EE7B7" class="input-styled" style="width:80px; height:40px; padding:4px; margin-top:0.5rem;"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" id="catCancel">Cancelar</button>
+      <button class="btn-primary" id="catSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CAMERA SCANNER -->
+<div class="modal-overlay hidden" id="scannerModal">
+  <div class="modal" style="display:flex; flex-direction:column; padding:0; height:80vh; max-height:800px;">
+    <div class="modal-header" style="padding:15px; border-bottom: 1px solid var(--border);">
+      <h2>Escanear Código</h2>
+      <button class="modal-close" id="scannerClose">✕</button>
+    </div>
+    <div class="modal-body" style="flex:1; overflow:hidden; padding:0; display:flex; justify-content:center; align-items:center; background:#000;">
+      <div id="reader" style="width:100%; height:100%;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DIALOG -->
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 id="confirmTitle">Confirmar</h2>
+      <button class="modal-close" id="confirmClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMsg"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" id="confirmNo">Cancelar</button>
+      <button class="btn-danger" id="confirmYes">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST NãoTIFICATION -->
+<div class="toast hidden" id="toast">
+  <span class="toast-icon" id="toastIcon">✅</span>
+  <span id="toastMsg"></span>
+</div>
+
+<!-- MODAL: COMPARTILHAR -->
+<div class="modal-overlay hidden" id="shareModal">
+  <div class="modal modal-sm" style="max-width: 440px;">
+    <div class="modal-header">
+      <h2>Compartilhar Produto</h2>
+      <button class="modal-close" id="shareClose">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex; flex-direction:column; gap:1rem;">
+      <div id="sharePreviewBox" style="background:var(--bg-dark, #0a0a12); border:1px solid var(--border); border-radius:12px; padding:1rem;">
+        <div style="font-size:0.75rem; color:var(--text-3); text-transform:uppercase; font-weight:700; margin-bottom:4px;">Descrição</div>
+        <div id="shareProdName" style="font-size:1.1rem; font-weight:700; color:var(--text-1); margin-bottom:0.8rem;"></div>
+        <div style="display:flex; gap:1rem;">
+          <div style="flex:1;">
+            <div style="font-size:0.75rem; color:var(--text-3); text-transform:uppercase; font-weight:700; margin-bottom:2px;">Vencimento</div>
+            <div id="shareProdExp" style="font-size:1rem; font-weight:700; color:#38BDF8;"></div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:0.75rem; color:var(--text-3); text-transform:uppercase; font-weight:700; margin-bottom:2px;">Quantidade</div>
+            <div id="shareProdQty" style="font-size:1rem; font-weight:700; color:var(--text-1);"></div>
+          </div>
+          <div style="flex:1;" id="shareCodeBox">
+            <div style="font-size:0.75rem; color:var(--text-3); text-transform:uppercase; font-weight:700; margin-bottom:2px;">Código EAN</div>
+            <div id="shareProdCode" style="font-size:0.95rem; font-weight:700; font-family:monospace; color:var(--text-2);"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:0.6rem; margin-top:0.5rem;">
+        <button class="btn-primary" id="btnShareText" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:0.75rem;">
+          <span>📝</span> Compartilhar Texto
+        </button>
+        <button class="btn-outline" id="btnShareImage" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:0.75rem; background:rgba(59,130,246,0.1); border-color:#3B82F6; color:#60A5FA;">
+          <span>🖼️</span> Compartilhar Print (Imagem)
+        </button>
+      </div>
+      <div id="shareImgPreviewContainer" style="display:none; text-align:center; margin-top:0.5rem;">
+        <img id="shareImgPreview" style="max-width:100%; border-radius:8px; border:1px solid var(--border);" />
+        <div style="margin-top:0.5rem; display:flex; gap:0.5rem; justify-content:center;">
+          <a id="btnDownloadShareImg" download="produto_compartilhado.png" class="btn-primary" style="text-decoration:none; font-size:0.85rem; padding:6px 12px;">⬇️ Baixar Imagem</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PERFIL DO USUÁRIO -->
+<div class="modal-overlay hidden" id="profileModal">
+  <div class="profile-modal-card">
+    <!-- Header -->
+    <div class="profile-modal-header">
+      <span style="font-size:0.9rem; font-weight:700; color:var(--text-2);">Meu perfil</span>
+      <button class="modal-close" id="profileModalClose">✕</button>
+    </div>
+    <!-- Avatar + Nome -->
+    <div class="profile-modal-body">
+      <div class="profile-avatar-wrap" id="profileAvatarBtn" title="Trocar foto">
+        <img id="profileAvatarImg" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Perfil" />
+        <div class="profile-avatar-edit-icon">📷</div>
+        <input type="file" id="profileAvatarInput" accept="image/*" style="display:none;"/>
+      </div>
+      <div class="profile-name" id="profileName">—</div>
+      <div class="profile-email" id="profileEmail">—</div>
+
+      <!-- Detalhes -->
+      <div class="profile-info-list">
+        <div class="profile-info-item">
+          <span class="profile-info-label">🏢 Empresa</span>
+          <span class="profile-info-value" id="profileCompany">—</span>
+        </div>
+        <div class="profile-info-item">
+          <span class="profile-info-label">💎 Plano</span>
+          <span class="profile-info-value" id="profilePlan">Gratuito</span>
+        </div>
+        <div class="profile-info-item">
+          <span class="profile-info-label">📦 Produtos</span>
+          <span class="profile-info-value" id="profileProductCount">0</span>
+        </div>
+      </div>
+
+      <!-- Botão Editar -->
+      <button class="profile-edit-btn" id="profileEditBtn">Editar perfil</button>
+
+      <!-- Formulário de edição (oculto por padrão) -->
+      <div id="profileEditForm" style="display:none; width:100%; margin-top:0.75rem;">
+        <div style="display:flex; flex-direction:column; gap:0.7rem;">
+          <input id="profileEditName" type="text" placeholder="Seu nome" style="width:100%; padding:0.7rem; background:var(--bg-3); border:1px solid var(--border); border-radius:10px; color:var(--text-1); font-size:0.9rem; box-sizing:border-box; outline:none; text-align:center;">
+          <input id="profileEditCompany" type="text" placeholder="Empresa (opcional)" style="width:100%; padding:0.7rem; background:var(--bg-3); border:1px solid var(--border); border-radius:10px; color:var(--text-1); font-size:0.9rem; box-sizing:border-box; outline:none; text-align:center;">
+          <button onclick="saveProfileEdit()" style="padding:0.8rem; background:var(--gradient-main); border:none; border-radius:9999px; color:#fff; font-weight:800; font-size:0.95rem; cursor:pointer; width:100%; box-shadow:0 4px 14px rgba(118,196,27,0.3);">Salvar</button>
+          <button onclick="cancelProfileEdit()" style="padding:0.6rem; background:transparent; border:1px solid var(--border); border-radius:9999px; color:var(--text-2); font-size:0.85rem; cursor:pointer; width:100%;">Cancelar</button>
+        </div>
+      </div>
+
+      <!-- Logout -->
+      <button onclick="handleLogout()" class="profile-logout-btn">🚪 Sair do App</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
+
+<!-- html5-qrcode (scanner página Scanner) -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<!-- Quagga2 (melhor leitura de código de barras 1D Não modal) -->
+<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+<!-- SheetJS para importar Excel -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+<script src="app.js?v=14"></script>
+</body>
+</html>
+
+
