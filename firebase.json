@@ -4,21 +4,17 @@
   },
   "hosting": [
     {
-      "site": "prazocerto",
-      "public": ".",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**",
-        "**/*.py",
-        "setup_*.js",
-        "deploy_*.js",
-        "upload_*.js",
-        "serviceAccountKey.json",
-        "output/**",
-        "package.json",
-        "package-lock.json",
-        "functions/**"
+      "site": "prazocerto-app",
+      "public": "www",
+      "rewrites": [
+        {
+          "source": "/",
+          "destination": "/index.html"
+        },
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
       ]
     }
   ],

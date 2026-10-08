@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
 const admin = require('firebase-admin');
@@ -66,28 +65,36 @@ app.use(express.static(__dirname));
 // Servir imagens estaticamente
 app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
 
-// Conectar ao banco de dados SQLite
-const db = new sqlite3.Database(path.join(__dirname, 'catalogo.db'), (err) => {
-    if (err) {
-        console.error('Erro ao conectar ao banco de dados:', err.message);
-    } else {
-        console.log('Conectado ao banco de dados SQLite (catalogo.db).');
-        // Garantir que a tabela existe, caso inicie o servidor antes de extrair
-        db.run(`CREATE TABLE IF NOT EXISTS produtos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ean TEXT UNIQUE,
-            nome TEXT,
-            foto TEXT
-        )`);
-        
-        // Criar a tabela de cache para evitar múltiplas chamadas ao Firebase
-        db.run(`CREATE TABLE IF NOT EXISTS produtos_cache (
-            codigo_barras TEXT PRIMARY KEY,
-            nome TEXT,
-            url_imagem TEXT
-        )`);
-    }
-});
+// Conectar ao banco de dados SQLite com fallback seguro para nuvem
+let sqlite3 = null;
+let db = null;
+try {
+    sqlite3 = require('sqlite3').verbose();
+    db = new sqlite3.Database(path.join(__dirname, 'catalogo.db'), (err) => {
+        if (err) {
+            console.warn('Aviso ao conectar ao SQLite local:', err.message);
+        } else {
+            console.log('Conectado ao banco de dados SQLite (catalogo.db).');
+            db.run(`CREATE TABLE IF NOT EXISTS produtos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ean TEXT UNIQUE,
+                nome TEXT,
+                foto TEXT
+            )`);
+            db.run(`CREATE TABLE IF NOT EXISTS produtos_cache (
+                codigo_barras TEXT PRIMARY KEY,
+                nome TEXT,
+                url_imagem TEXT
+            )`);
+        }
+    });
+} catch (sqliteErr) {
+    console.warn('SQLite3 nativo desabilitado na nuvem (usando Firebase Firestore/APIs):', sqliteErr.message);
+    db = {
+        get: (query, params, cb) => cb(null, null),
+        run: () => {}
+    };
+}
 
 // Buscar produto pelo EAN (Cascata: Cache SQLite -> Firebase -> APIs Externas)
 app.get('/api/produtos/:ean', async (req, res) => {

@@ -1,6 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Funções auxiliares de autorização
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRecord() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function getAccountId() {
+      let u = getUserRecord();
+      return u != null && u.accountId != null ? u.accountId : request.auth.uid;
+    }
+    
+    function getUserRole() {
+      let u = getUserRecord();
+      return u != null && u.role != null ? u.role : 'owner';
+    }
+    
+    function getUserStatus() {
+      let u = getUserRecord();
+      return u != null && u.status != null ? u.status : 'active';
+    }
+    
+    function hasPermission(perm) {
+      let u = getUserRecord();
+      return u != null && (
+        u.role == 'owner' || 
+        (u.status == 'active' && u.permissions != null && u.permissions[perm] == true)
+      );
+    }
+
     // Permite que qualquer um leia o catálogo de fichas técnicas
     match /fichas_tecnicas/{document} {
       allow read: if true;
@@ -11,9 +43,54 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Permite leitura e escrita apenas para o usuário autenticado dono dos próprios dados
-    match /user_data/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // Catálogo global em cache compartilhado de produtos (custo zero / somente texto)
+    match /produtos_cache/{gtin} {
+      allow read, write: if true;
+    }
+
+    // Coleção de usuários (perfil, vinculação de conta, role, status e permissões)
+    match /users/{userId} {
+      // Usuário pode ler e gravar seu próprio registro de login / perfil
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        (resource != null && resource.data.accountId == getAccountId() && getUserRole() == 'owner')
+      );
+      allow create, update: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        (request.resource.data.accountId == getAccountId() && getUserRole() == 'owner')
+      );
+      allow delete: if isAuthenticated() && getUserRole() == 'owner' && resource.data.accountId == getAccountId();
+    }
+
+    // Dados da conta / empresa (produtos, lojas, configurações)
+    match /user_data/{targetAccountId} {
+      // Pode ler se for o dono direto OU funcionário ativo vinculado a este accountId
+      allow read: if isAuthenticated() && (
+        request.auth.uid == targetAccountId || 
+        (getAccountId() == targetAccountId && getUserStatus() == 'active')
+      );
+      // Pode atualizar se for o dono OU se for funcionário ativo com permissão
+      allow write: if isAuthenticated() && (
+        request.auth.uid == targetAccountId || 
+        (getAccountId() == targetAccountId && getUserStatus() == 'active' && (
+          hasPermission('createProducts') || hasPermission('editProducts') || hasPermission('deleteProducts')
+        ))
+      );
+    }
+
+    // Convites de novos funcionários gerados pelo dono
+    match /invites/{inviteCode} {
+      // Qualquer usuário autenticado pode ler um convite para validá-lo durante o cadastro
+      allow read: if isAuthenticated();
+      // Apenas o dono da conta pode criar convites vinculados ao seu próprio accountId
+      allow create: if isAuthenticated() && request.resource.data.accountId == getAccountId() && getUserRole() == 'owner';
+      // Atualização permitida para marcar o convite como usado ou pelo dono da conta
+      allow update: if isAuthenticated() && (
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt']) && request.resource.data.status == 'used') ||
+        (resource.data.accountId == getAccountId() && getUserRole() == 'owner')
+      );
+      // Apenas o dono pode excluir/cancelar o convite
+      allow delete: if isAuthenticated() && resource.data.accountId == getAccountId() && getUserRole() == 'owner';
     }
   }
 }

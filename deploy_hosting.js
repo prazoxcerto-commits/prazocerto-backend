@@ -13,8 +13,8 @@ const zlib   = require('zlib');
 
 const SA_PATH   = path.join(__dirname, 'serviceAccountKey.json');
 const sa        = JSON.parse(fs.readFileSync(SA_PATH, 'utf8'));
-const SITE_ID   = 'prazocerto';
-const PUBLIC_DIR = __dirname;
+const SITE_ID   = 'prazocerto-app';
+const PUBLIC_DIR = path.join(__dirname, 'www');
 
 // Arquivos a ignorar no deploy
 const IGNORE = new Set([
@@ -203,9 +203,9 @@ function collectFiles(dir, baseDir = dir) {
     );
     if (relRes.status === 200) {
       console.log('=======================================================');
-      console.log('DEPLOY CONCLUIDO!');
-      console.log('  App: https://prazocerto.web.app');
-      console.log('  App: https://prazocerto.firebaseapp.com');
+      console.log('DEPLOY CONCLUIDO COM SUCESSO!');
+      console.log(`  App: https://${SITE_ID}.web.app`);
+      console.log(`  App: https://${SITE_ID}.firebaseapp.com`);
       console.log('=======================================================');
     } else {
       console.log('Resposta release:', JSON.stringify(relRes.body).slice(0,300));
