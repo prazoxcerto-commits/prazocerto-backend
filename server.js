@@ -1,11 +1,21 @@
+require('dotenv').config();
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
 const admin = require('firebase-admin');
 const fs = require('fs');
+const { MercadoPagoConfig, Payment, PreApproval } = require('mercadopago');
 
 const app = express();
+
+const PORT = process.env.PORT || 8888;
+
+// Inicializar Mercado Pago
+const mpAccessToken = process.env.MP_ACCESS_TOKEN || '';
+const mpClient = new MercadoPagoConfig({ accessToken: mpAccessToken });
+const paymentClient = new Payment(mpClient);
+const preApprovalClient = new PreApproval(mpClient);
 
 // Inicializar Firebase Admin
 let firestore = null;
@@ -13,11 +23,13 @@ try {
     const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
     if (fs.existsSync(serviceAccountPath)) {
         const serviceAccount = require(serviceAccountPath);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-        firestore = admin.firestore();
-        console.log('Firebase Admin inicializado com sucesso.');
+        if (admin && admin.credential) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+            firestore = admin.firestore();
+            console.log('Firebase Admin inicializado com sucesso.');
+        }
     } else {
         console.warn('AVISO: serviceAccountKey.json não encontrado. O Firebase Firestore não funcionará.');
     }
@@ -25,9 +37,9 @@ try {
     console.error('Erro ao inicializar Firebase Admin:', error);
 }
 // ── Credenciais da API GTIN OSCBR ──────────────────
-// Configure via env vars no Render: OSCBR_USER e OSCBR_PASS
-const OSCBR_USER = process.env.OSCBR_USER || '';
-const OSCBR_PASS = process.env.OSCBR_PASS || '';
+// Configure via env vars no Render ou usa as credenciais padrão cadastradas
+const OSCBR_USER = process.env.OSCBR_USER || 'estudante.junior';
+const OSCBR_PASS = process.env.OSCBR_PASS || '58260233lL@@';
 
 let _oscbrToken = null;
 let _oscbrTokenExpires = 0;
@@ -119,6 +131,26 @@ app.get('/api/produtos/:ean', async (req, res) => {
             if (apiData && apiData.status === 1 && apiData.product) {
                 nome = apiData.product.product_name;
                 url_imagem = apiData.product.image_url;
+            }
+
+            // Passo 3.5: Buscar API Produto XYZ (Colaborativa BR - Limpeza, Perfumaria, Alimentos)
+            if (!nome || !url_imagem) {
+                try {
+                    console.log(`[API Produto XYZ] Buscando EAN: ${ean}`);
+                    const xyzRes = await fetch(`https://api.produto.xyz/v1/gtin/${ean}`, { signal: AbortSignal.timeout(5000) });
+                    if (xyzRes.ok) {
+                        const xyzData = await xyzRes.json();
+                        const prod = xyzData.Product || xyzData.product || xyzData;
+                        if (prod && (prod.name || prod.nome)) {
+                            if (!nome) nome = prod.name || prod.nome;
+                            if (!url_imagem && (prod.image_url || prod.picture || prod.foto)) {
+                                url_imagem = prod.image_url || prod.picture || prod.foto;
+                            }
+                        }
+                    }
+                } catch (xyzErr) {
+                    console.warn('[API Produto XYZ] Erro:', xyzErr.message);
+                }
             }
             
             // Passo 4: Fallback GTIN OSCBR v3
@@ -220,6 +252,146 @@ app.delete('/api/produtos/:id', (req, res) => {
     });
 });
 
+// ── ROTAS DE CHECKOUT MERCADO PAGO ──────────────────
+
+// 1. Gerar Pix Dinâmico
+app.post('/api/checkout/pix', async (req, res) => {
+    try {
+        const { planId, planName, amount, email, firstName, cpf, userId } = req.body;
+
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ error: "Valor inválido para o plano." });
+        }
+
+        const externalRef = JSON.stringify({
+            userId: userId || 'anon',
+            planId: planId || 'PLANO',
+            createdAt: Date.now()
+        });
+
+        const payment = await paymentClient.create({
+            body: {
+                transaction_amount: Number(amount),
+                description: `Assinatura PrazoCerto - Plano ${planName || planId}`,
+                payment_method_id: 'pix',
+                external_reference: externalRef,
+                payer: {
+                    email: email || 'cliente@prazocerto.com',
+                    first_name: firstName || 'Cliente PrazoCerto',
+                    identification: {
+                        type: 'CPF',
+                        number: (cpf || '00000000000').replace(/\D/g, '')
+                    }
+                }
+            }
+        });
+
+        const txData = payment.point_of_interaction?.transaction_data;
+
+        res.json({
+            id: payment.id,
+            status: payment.status,
+            qrCode: txData?.qr_code,
+            qrCodeBase64: txData?.qr_code_base64,
+            expiresAt: payment.date_of_expiration
+        });
+    } catch (error) {
+        console.error("Erro ao gerar Pix no Mercado Pago:", error);
+        res.status(500).json({ 
+            error: error?.message || "Falha ao gerar cobrança Pix.",
+            details: error?.cause || null
+        });
+    }
+});
+
+// 2. Consultar status do pagamento Pix
+app.get('/api/checkout/status/:id', async (req, res) => {
+    try {
+        const payment = await paymentClient.get({ id: req.params.id });
+        res.json({
+            id: payment.id,
+            status: payment.status,
+            statusDetail: payment.status_detail
+        });
+    } catch (error) {
+        console.error("Erro ao consultar pagamento:", error);
+        res.status(500).json({ error: error?.message || "Erro ao consultar status." });
+    }
+});
+
+// 3. Assinatura com Cartão de Crédito
+app.post('/api/checkout/card', async (req, res) => {
+    try {
+        const { cardToken, email, planId, planName, amount, userId } = req.body;
+
+        if (!cardToken || !email || !amount) {
+            return res.status(400).json({ error: "Dados incompletos para processar cartão." });
+        }
+
+        const subscription = await preApprovalClient.create({
+            body: {
+                reason: `Assinatura PrazoCerto - Plano ${planName || planId}`,
+                card_token_id: cardToken,
+                payer_email: email,
+                auto_recurring: {
+                    frequency: 1,
+                    frequency_type: 'months',
+                    transaction_amount: Number(amount),
+                    currency_id: 'BRL'
+                },
+                status: 'authorized',
+                external_reference: JSON.stringify({ userId: userId || 'anon', planId })
+            }
+        });
+
+        res.json({
+            id: subscription.id,
+            status: subscription.status,
+            initPoint: subscription.init_point
+        });
+    } catch (error) {
+        console.error("Erro ao assinar com Cartão:", error);
+        res.status(500).json({ error: error?.message || "Falha ao processar assinatura no cartão." });
+    }
+});
+
+// 4. Webhook Mercado Pago (Notificações)
+app.post('/webhooks/mercadopago', async (req, res) => {
+    res.status(200).send({ received: true });
+    const { type, data } = req.body;
+    const entityId = data?.id;
+
+    if (!entityId) return;
+
+    try {
+        if (type === 'payment') {
+            const payment = await paymentClient.get({ id: entityId });
+            console.log(`[Webhook MP] Pagamento ${entityId} status: ${payment.status}`);
+
+            if (payment.status === 'approved' && firestore) {
+                try {
+                    const extRef = JSON.parse(payment.external_reference || '{}');
+                    if (extRef.userId && extRef.userId !== 'anon') {
+                        await firestore.collection('user_data').doc(extRef.userId).set({
+                            planoId: extRef.planId,
+                            planoAtualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+                            subscriptionCanceled: false,
+                            autoRenew: true,
+                            ultimoPagamentoId: entityId
+                        }, { merge: true });
+                        console.log(`[Webhook MP] Plano ${extRef.planId} ativado para usuário ${extRef.userId}`);
+                    }
+                } catch (e) {
+                    console.warn('[Webhook MP] Erro ao parsear external_reference:', e);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[Webhook MP Error]:', err?.message || err);
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
+
