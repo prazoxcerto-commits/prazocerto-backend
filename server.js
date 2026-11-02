@@ -4,7 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const admin = require('firebase-admin');
 const fs = require('fs');
-const { MercadoPagoConfig, Payment, PreApproval } = require('mercadopago');
+const { MercadoPagoConfig, Payment, PreApproval, PaymentRefund } = require('mercadopago');
 
 const app = express();
 
@@ -15,6 +15,7 @@ const mpAccessToken = process.env.MP_ACCESS_TOKEN || '';
 const mpClient = new MercadoPagoConfig({ accessToken: mpAccessToken });
 const paymentClient = new Payment(mpClient);
 const preApprovalClient = new PreApproval(mpClient);
+const refundClient = new PaymentRefund(mpClient);
 
 // Inicializar Firebase Admin
 let firestore = null;
@@ -35,8 +36,8 @@ try {
 } catch (error) {
     console.error('Erro ao inicializar Firebase Admin:', error);
 }
+
 // ── Credenciais da API GTIN OSCBR ──────────────────
-// Configure via env vars no Render ou usa as credenciais padrão cadastradas
 const OSCBR_USER = process.env.OSCBR_USER || 'estudante.junior';
 const OSCBR_PASS = process.env.OSCBR_PASS || '58260233lL@@';
 
@@ -57,12 +58,9 @@ async function getOscbrToken() {
     return _oscbrToken;
 }
 
-
 app.use(cors());
 app.use(express.json());
-// Servir os arquivos HTML/CSS/JS principais
 app.use(express.static(__dirname));
-// Servir imagens estaticamente
 app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
 
 // Conectar ao banco de dados SQLite com fallback seguro para nuvem
@@ -119,7 +117,6 @@ app.get('/api/produtos/:ean', async (req, res) => {
                     console.log(`[Firebase Firestore] Encontrado EAN: ${ean}`);
                     const data = docSnap.data();
                     
-                    // Salva no SQLite local
                     db.run("INSERT OR REPLACE INTO produtos_cache (codigo_barras, nome, url_imagem) VALUES (?, ?, ?)", 
                            [ean, data.nome, data.url_imagem]);
                     
@@ -140,7 +137,7 @@ app.get('/api/produtos/:ean', async (req, res) => {
                 url_imagem = apiData.product.image_url;
             }
 
-            // Passo 3.5: Buscar API Produto XYZ (Colaborativa BR - Limpeza, Perfumaria, Alimentos)
+            // Passo 3.5: Buscar API Produto XYZ
             if (!nome || !url_imagem) {
                 try {
                     console.log(`[API Produto XYZ] Buscando EAN: ${ean}`);
@@ -167,16 +164,13 @@ app.get('/api/produtos/:ean', async (req, res) => {
                     const token = await getOscbrToken();
                     const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' };
 
-                    // Busca info do produto
                     const infoRes = await fetch(`https://gtin.rscsistemas.com.br/api/v3/gtin/${ean}`, { headers });
                     if (infoRes.ok) {
                         const infoData = await infoRes.json();
                         if (!nome) nome = infoData.nome || infoData.descricao || null;
-                        // link_foto vem direto no response da info
                         if (!url_imagem && infoData.link_foto) url_imagem = infoData.link_foto;
                     }
 
-                    // Se ainda não tem imagem, usa o endpoint de imagem (retorna PNG binário)
                     if (!url_imagem) {
                         url_imagem = `https://gtin.rscsistemas.com.br/api/v3/gtin/${ean}/image`;
                     }
@@ -185,7 +179,7 @@ app.get('/api/produtos/:ean', async (req, res) => {
                 }
             }
             
-            // Passo 5: Salvar nas tabelas para não gastar chamadas no futuro
+            // Passo 5: Salvar nas tabelas para cache
             if (nome || url_imagem) {
                 if (firestore) {
                     await firestore.collection('produtos_catalogo').doc(ean).set({
@@ -273,18 +267,20 @@ app.post('/api/checkout/pix', async (req, res) => {
         const externalRef = JSON.stringify({
             userId: userId || 'anon',
             planId: planId || 'PLANO',
+            email: email || '',
             createdAt: Date.now()
         });
 
         const payment = await paymentClient.create({
             body: {
                 transaction_amount: Number(amount),
-                description: `Assinatura PrazoCerto - Plano ${planName || planId}`,
+                description: `Assinatura PrazoPro - Plano ${planName || planId}`,
                 payment_method_id: 'pix',
+                notification_url: 'https://prazocerto-backend-cf11.onrender.com/webhooks/mercadopago',
                 external_reference: externalRef,
                 payer: {
                     email: email || 'cliente@prazocerto.com',
-                    first_name: firstName || 'Cliente PrazoCerto',
+                    first_name: firstName || 'Cliente PrazoPro',
                     identification: {
                         type: 'CPF',
                         number: (cpf || '00000000000').replace(/\D/g, '')
@@ -337,9 +333,10 @@ app.post('/api/checkout/card', async (req, res) => {
 
         const subscription = await preApprovalClient.create({
             body: {
-                reason: `Assinatura PrazoCerto - Plano ${planName || planId}`,
+                reason: `Assinatura PrazoPro - Plano ${planName || planId}`,
                 card_token_id: cardToken,
                 payer_email: email,
+                notification_url: 'https://prazocerto-backend-cf11.onrender.com/webhooks/mercadopago',
                 auto_recurring: {
                     frequency: 1,
                     frequency_type: 'months',
@@ -347,7 +344,7 @@ app.post('/api/checkout/card', async (req, res) => {
                     currency_id: 'BRL'
                 },
                 status: 'authorized',
-                external_reference: JSON.stringify({ userId: userId || 'anon', planId })
+                external_reference: JSON.stringify({ userId: userId || 'anon', planId, email })
             }
         });
 
@@ -362,43 +359,171 @@ app.post('/api/checkout/card', async (req, res) => {
     }
 });
 
-// 4. Webhook Mercado Pago (Notificações)
+// 4. Webhook Mercado Pago (Notificações Automáticas)
 app.post('/webhooks/mercadopago', async (req, res) => {
     res.status(200).send({ received: true });
-    const { type, data } = req.body;
-    const entityId = data?.id;
+    const { type, data, action } = req.body;
+    const entityId = data?.id || req.query['data.id'] || req.query.id;
 
     if (!entityId) return;
 
     try {
-        if (type === 'payment') {
+        if (type === 'subscription_preapproval' || action === 'subscription_preapproval') {
+            const sub = await preApprovalClient.get({ id: String(entityId) });
+            console.log(`[Webhook MP] Assinatura Cartão ${entityId} status: ${sub.status}`);
+            if (sub.status === 'authorized' && firestore) {
+                try {
+                    const extRef = JSON.parse(sub.external_reference || '{}');
+                    const planId = extRef.planId || 'BRONZE';
+                    const payerEmail = sub.payer_email || extRef.email || '';
+                    const accessDate = new Date();
+                    accessDate.setDate(accessDate.getDate() + 30);
+
+                    if (extRef.userId && extRef.userId !== 'anon') {
+                        await firestore.collection('user_data').doc(extRef.userId).set({
+                            planoId: planId,
+                            planoNome: planId,
+                            planoAtualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+                            subscriptionCanceled: false,
+                            autoRenew: true,
+                            subscriptionId: entityId,
+                            accessUntil: accessDate.toISOString()
+                        }, { merge: true });
+                        console.log(`[Webhook MP] user_data ativado (Cartão) UID ${extRef.userId} -> ${planId}`);
+                    }
+
+                    if (payerEmail) {
+                        const emailKey = payerEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
+                        await firestore.collection('admin_plan_grants').doc(emailKey).set({
+                            plan: planId,
+                            planoId: planId,
+                            email: payerEmail.toLowerCase(),
+                            grantedBy: 'mercadopago_subscription_webhook',
+                            grantedAt: new Date().toISOString(),
+                            reason: `Assinatura Cartão aprovada MP #${entityId}`,
+                            expiresAt: accessDate.toISOString().split('T')[0],
+                            origin: 'mercadopago_card',
+                            subscriptionId: entityId
+                        }, { merge: true });
+                        console.log(`[Webhook MP] admin_plan_grants ativado (Cartão) para ${payerEmail} -> ${planId}`);
+                    }
+                } catch (e) {
+                    console.warn('[Webhook MP] Erro ao processar assinatura preapproval:', e);
+                }
+            }
+        } else if (type === 'payment' || action === 'payment.created' || action === 'payment.updated') {
             const payment = await paymentClient.get({ id: entityId });
             console.log(`[Webhook MP] Pagamento ${entityId} status: ${payment.status}`);
 
             if (payment.status === 'approved' && firestore) {
                 try {
                     const extRef = JSON.parse(payment.external_reference || '{}');
+                    const planId = extRef.planId || 'BRONZE';
+                    const payerEmail = payment.payer?.email || extRef.email || '';
+                    const accessDate = new Date();
+                    accessDate.setDate(accessDate.getDate() + 30);
+
+                    // 1. Grava no doc do usuário por UID (se existir)
                     if (extRef.userId && extRef.userId !== 'anon') {
                         await firestore.collection('user_data').doc(extRef.userId).set({
-                            planoId: extRef.planId,
+                            planoId: planId,
+                            planoNome: planId,
                             planoAtualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
                             subscriptionCanceled: false,
                             autoRenew: true,
-                            ultimoPagamentoId: entityId
+                            ultimoPagamentoId: entityId,
+                            accessUntil: accessDate.toISOString()
                         }, { merge: true });
-                        console.log(`[Webhook MP] Plano ${extRef.planId} ativado para usuário ${extRef.userId}`);
+                        console.log(`[Webhook MP] user_data ativado para UID ${extRef.userId} -> ${planId}`);
+                    }
+
+                    // 2. Grava na collection admin_plan_grants pelo email sanitizado
+                    if (payerEmail) {
+                        const emailKey = payerEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
+                        await firestore.collection('admin_plan_grants').doc(emailKey).set({
+                            plan: planId,
+                            planoId: planId,
+                            email: payerEmail.toLowerCase(),
+                            grantedBy: 'mercadopago_webhook',
+                            grantedAt: new Date().toISOString(),
+                            reason: `Pagamento Pix aprovado MP #${entityId}`,
+                            expiresAt: accessDate.toISOString().split('T')[0],
+                            origin: 'mercadopago_pix',
+                            paymentId: entityId
+                        }, { merge: true });
+                        console.log(`[Webhook MP] admin_plan_grants ativado para ${payerEmail} -> ${planId}`);
                     }
                 } catch (e) {
-                    console.warn('[Webhook MP] Erro ao parsear external_reference:', e);
+                    console.warn('[Webhook MP] Erro ao processar external_reference:', e);
                 }
             }
         }
-    } catch (err) {
-        console.error('[Webhook MP Error]:', err?.message || err);
+    } catch (errWebhook) {
+        console.error('[Webhook MP] Erro na consulta do pagamento:', errWebhook);
+    }
+});
+
+// 5. Estorno automático de pagamento e cancelamento de assinatura (Dentro dos 7 dias CDC)
+app.post('/api/checkout/refund', async (req, res) => {
+    try {
+        const { userId, paymentId, subscriptionId } = req.body;
+        console.log(`[Reembolso CDC] Solicitado para userId=${userId}, paymentId=${paymentId}, subscriptionId=${subscriptionId}`);
+
+        let refundResult = null;
+        let subCancelResult = null;
+
+        // 1. Cancelar assinatura recorrente se houver
+        if (subscriptionId) {
+            try {
+                subCancelResult = await preApprovalClient.update({
+                    id: String(subscriptionId),
+                    body: { status: 'cancelled' }
+                });
+                console.log(`[Reembolso CDC] Assinatura ${subscriptionId} cancelada no MP com sucesso.`);
+            } catch (errSub) {
+                console.warn(`[Reembolso CDC] Aviso ao cancelar assinatura ${subscriptionId}:`, errSub?.message || errSub);
+            }
+        }
+
+        // 2. Se tiver paymentId, estorna o pagamento
+        if (paymentId) {
+            try {
+                refundResult = await refundClient.create({
+                    payment_id: String(paymentId)
+                });
+                console.log(`[Reembolso CDC] Pagamento ${paymentId} estornado com sucesso no MP.`);
+            } catch (errRef) {
+                console.warn(`[Reembolso CDC] Aviso ao estornar pagamento ${paymentId}:`, errRef?.message || errRef);
+            }
+        }
+
+        // 3. Atualiza status no Firestore
+        if (userId && firestore) {
+            try {
+                await firestore.collection('user_data').doc(userId).set({
+                    planoId: 'GRATUITO',
+                    planoNome: 'GRATUITO',
+                    subscriptionCanceled: true,
+                    refundProcessed: true,
+                    refundAt: admin.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch (errFs) {
+                console.warn('[Reembolso CDC] Erro ao atualizar Firestore:', errFs);
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Estorno e cancelamento processados com sucesso.',
+            refund: refundResult,
+            subscription: subCancelResult
+        });
+    } catch (error) {
+        console.error('[Reembolso CDC Erro geral]:', error);
+        res.status(500).json({ error: error?.message || 'Falha ao processar estorno automático.' });
     }
 });
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
-
