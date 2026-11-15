@@ -264,12 +264,8 @@ app.post('/api/checkout/pix', async (req, res) => {
             return res.status(400).json({ error: "Valor inválido para o plano." });
         }
 
-        const externalRef = JSON.stringify({
-            userId: userId || 'anon',
-            planId: planId || 'PLANO',
-            email: email || '',
-            createdAt: Date.now()
-        });
+        const cleanEmail = (email || '').replace(/@/g, '_at_');
+        const externalRef = `${userId || 'anon'}___${planId || 'PLANO'}___${cleanEmail}`;
 
         const payment = await paymentClient.create({
             body: {
@@ -331,6 +327,9 @@ app.post('/api/checkout/card', async (req, res) => {
             return res.status(400).json({ error: "Dados incompletos para processar cartão." });
         }
 
+        const cleanEmail = String(email || '').replace(/@/g, '_at_');
+        const externalRef = `${userId || 'anon'}___${planId || 'PLANO'}___${cleanEmail}`;
+
         const subscription = await preApprovalClient.create({
             body: {
                 reason: `Assinatura PrazoPro - Plano ${planName || planId}`,
@@ -344,7 +343,7 @@ app.post('/api/checkout/card', async (req, res) => {
                     currency_id: 'BRL'
                 },
                 status: 'authorized',
-                external_reference: JSON.stringify({ userId: userId || 'anon', planId, email })
+                external_reference: externalRef
             }
         });
 
@@ -373,14 +372,24 @@ app.post('/webhooks/mercadopago', async (req, res) => {
             console.log(`[Webhook MP] Assinatura Cartão ${entityId} status: ${sub.status}`);
             if (sub.status === 'authorized' && firestore) {
                 try {
-                    const extRef = JSON.parse(sub.external_reference || '{}');
-                    const planId = extRef.planId || 'BRONZE';
-                    const payerEmail = sub.payer_email || extRef.email || '';
+                    let userId = 'anon';
+                    let planId = 'BRONZE';
+                    let payerEmail = sub.payer_email || '';
+
+                    if (sub.external_reference) {
+                        const parts = sub.external_reference.split('___');
+                        if (parts.length >= 2) {
+                            userId = parts[0];
+                            planId = parts[1];
+                            if (parts[2]) payerEmail = parts[2].replace(/_at_/g, '@');
+                        }
+                    }
+
                     const accessDate = new Date();
                     accessDate.setDate(accessDate.getDate() + 30);
 
-                    if (extRef.userId && extRef.userId !== 'anon') {
-                        await firestore.collection('user_data').doc(extRef.userId).set({
+                    if (userId && userId !== 'anon') {
+                        await firestore.collection('user_data').doc(userId).set({
                             planoId: planId,
                             planoNome: planId,
                             planoAtualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
@@ -389,7 +398,7 @@ app.post('/webhooks/mercadopago', async (req, res) => {
                             subscriptionId: entityId,
                             accessUntil: accessDate.toISOString()
                         }, { merge: true });
-                        console.log(`[Webhook MP] user_data ativado (Cartão) UID ${extRef.userId} -> ${planId}`);
+                        console.log(`[Webhook MP] user_data ativado (Cartão) UID ${userId} -> ${planId}`);
                     }
 
                     if (payerEmail) {
@@ -417,15 +426,24 @@ app.post('/webhooks/mercadopago', async (req, res) => {
 
             if (payment.status === 'approved' && firestore) {
                 try {
-                    const extRef = JSON.parse(payment.external_reference || '{}');
-                    const planId = extRef.planId || 'BRONZE';
-                    const payerEmail = payment.payer?.email || extRef.email || '';
+                    let userId = 'anon';
+                    let planId = 'BRONZE';
+                    let payerEmail = payment.payer?.email || '';
+
+                    if (payment.external_reference) {
+                        const parts = payment.external_reference.split('___');
+                        if (parts.length >= 2) {
+                            userId = parts[0];
+                            planId = parts[1];
+                            if (parts[2]) payerEmail = parts[2].replace(/_at_/g, '@');
+                        }
+                    }
+
                     const accessDate = new Date();
                     accessDate.setDate(accessDate.getDate() + 30);
 
-                    // 1. Grava no doc do usuário por UID (se existir)
-                    if (extRef.userId && extRef.userId !== 'anon') {
-                        await firestore.collection('user_data').doc(extRef.userId).set({
+                    if (userId && userId !== 'anon') {
+                        await firestore.collection('user_data').doc(userId).set({
                             planoId: planId,
                             planoNome: planId,
                             planoAtualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
@@ -434,10 +452,9 @@ app.post('/webhooks/mercadopago', async (req, res) => {
                             ultimoPagamentoId: entityId,
                             accessUntil: accessDate.toISOString()
                         }, { merge: true });
-                        console.log(`[Webhook MP] user_data ativado para UID ${extRef.userId} -> ${planId}`);
+                        console.log(`[Webhook MP] user_data ativado para UID ${userId} -> ${planId}`);
                     }
 
-                    // 2. Grava na collection admin_plan_grants pelo email sanitizado
                     if (payerEmail) {
                         const emailKey = payerEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
                         await firestore.collection('admin_plan_grants').doc(emailKey).set({
@@ -472,7 +489,6 @@ app.post('/api/checkout/refund', async (req, res) => {
         let refundResult = null;
         let subCancelResult = null;
 
-        // 1. Cancelar assinatura recorrente se houver
         if (subscriptionId) {
             try {
                 subCancelResult = await preApprovalClient.update({
@@ -485,7 +501,6 @@ app.post('/api/checkout/refund', async (req, res) => {
             }
         }
 
-        // 2. Se tiver paymentId, estorna o pagamento
         if (paymentId) {
             try {
                 refundResult = await refundClient.create({
@@ -497,7 +512,6 @@ app.post('/api/checkout/refund', async (req, res) => {
             }
         }
 
-        // 3. Atualiza status no Firestore
         if (userId && firestore) {
             try {
                 await firestore.collection('user_data').doc(userId).set({
