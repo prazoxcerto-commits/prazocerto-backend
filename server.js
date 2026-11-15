@@ -336,7 +336,7 @@ app.post('/api/checkout/card', async (req, res) => {
                 reason: `Assinatura PrazoPro - Plano ${planName || planId}`,
                 card_token_id: cardToken,
                 payer_email: email,
-                notification_url: 'https://prazocerto-backend-cf11.onrender.com/webhooks/mercadopago',
+                back_url: 'https://prazopro-app.web.app',
                 auto_recurring: {
                     frequency: 1,
                     frequency_type: 'months',
